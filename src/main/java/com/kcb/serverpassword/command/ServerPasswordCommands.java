@@ -13,6 +13,7 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
 
@@ -74,7 +75,16 @@ public final class ServerPasswordCommands {
 				: attempt.equals(mod.getConfig().password);
 
 		if (loggedIn) {
+			AuthManager.FrozenPos frozen = auth.getFrozenPos(uuid);
 			auth.markAuthenticated(uuid);
+
+			if (frozen != null) {
+				player.setGameMode(frozen.originalGameMode());
+				player.setDeltaMovement(Vec3.ZERO);
+				player.fallDistance = 0;
+			}
+			mod.getPendingGameModeStore().clear(username);
+
 			player.sendSystemMessage(Component.literal("§aLogin successful. Welcome!"));
 			return 1;
 		}

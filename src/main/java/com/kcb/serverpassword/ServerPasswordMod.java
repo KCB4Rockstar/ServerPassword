@@ -3,6 +3,7 @@ package com.kcb.serverpassword;
 import com.kcb.serverpassword.command.ServerPasswordCommands;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
@@ -15,6 +16,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,7 @@ public class ServerPasswordMod implements ModInitializer {
 
 	private final AuthManager authManager = new AuthManager();
 	private PlayerPasswordManager playerPasswordManager;
+	private PendingGameModeStore pendingGameModeStore;
 	private ModConfig config;
 	private long tickCounter = 0;
 
@@ -46,6 +49,10 @@ public class ServerPasswordMod implements ModInitializer {
 		return playerPasswordManager;
 	}
 
+	public PendingGameModeStore getPendingGameModeStore() {
+		return pendingGameModeStore;
+	}
+
 	public ModConfig getConfig() {
 		return config;
 	}
@@ -59,6 +66,7 @@ public class ServerPasswordMod implements ModInitializer {
 		instance = this;
 		config = ModConfig.load();
 		playerPasswordManager = PlayerPasswordManager.load();
+		pendingGameModeStore = PendingGameModeStore.load();
 
 		if (config.password == null || config.password.isBlank() || config.password.equals("changeme")) {
 			LOGGER.warn("ServerPassword is using the default password! Set a real one with /serverpassword set <password>, or by editing config/serverpassword.json");
@@ -70,14 +78,36 @@ public class ServerPasswordMod implements ModInitializer {
 			}
 
 			ServerPlayer player = handler.player;
+			GameType originalGameMode = pendingGameModeStore.resolveOriginal(player.getGameProfile().name(), player.gameMode());
+
 			authManager.markUnauthenticated(player.getUUID(), new AuthManager.FrozenPos(
-					player.level(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(), tickCounter));
+					player.level(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(),
+					tickCounter, originalGameMode));
+
+			// Spectator mode is what actually satisfies "not affected by anything until
+			// logged in": vanilla already makes spectators immune to all damage (fall,
+			// fire, drowning, mobs, other players, redstone-triggered traps - it's all
+			// the same hurt() path), untargetable by hostile mobs, and exempt from
+			// hunger loss - all for free, without us having to special-case each one.
+			player.setGameMode(GameType.SPECTATOR);
 
 			player.sendSystemMessage(Component.literal("§eThis server is password protected. Type §6/login <password>§e to continue."));
 		});
 
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-				authManager.forget(handler.player.getUUID()));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			ServerPlayer player = handler.player;
+			AuthManager.FrozenPos frozen = authManager.getFrozenPos(player.getUUID());
+
+			if (frozen != null) {
+				// Best-effort: if this lands before the player's data is saved, their
+				// saved gamemode won't incorrectly be "spectator". Not load-bearing for
+				// correctness either way - PendingGameModeStore is the real safety net,
+				// and is only ever cleared by a confirmed successful login, not this.
+				player.setGameMode(frozen.originalGameMode());
+			}
+
+			authManager.forget(player.getUUID());
+		});
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				ServerPasswordCommands.register(dispatcher));
@@ -146,6 +176,16 @@ public class ServerPasswordMod implements ModInitializer {
 		UseItemCallback.EVENT.register((player, level, hand) -> guard(player));
 		AttackEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> guard(player));
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> guard(player));
+
+		// Belt-and-suspenders on top of the spectator-mode invulnerability: a
+		// modified client can't skip a UI restriction that never existed for it in
+		// the first place, but this closes the loop server-side regardless.
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+			if (entity instanceof ServerPlayer player) {
+				return authManager.isAuthenticated(player.getUUID()) || !config.enabled;
+			}
+			return true;
+		});
 	}
 
 	private InteractionResult guard(Player player) {

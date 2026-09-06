@@ -11,13 +11,15 @@ When a player joins:
 - They can't run any command except `/login`.
 - They can't break/place blocks, use items, or attack/interact with anything.
 - They can't pick up or drop items, or touch their inventory (including creative-mode edits) at all.
+- They're switched to spectator mode, so they can't take any damage (fall, fire, drowning, mobs, other players, redstone-triggered traps — all of it), don't lose hunger, and can't be targeted by hostile mobs. If they were mid-fall when they disconnected, they simply stop falling until they log back in.
 - They're kicked if they don't log in within 60 seconds (configurable).
 
 All of that lifts the moment they run `/login <password>` with the correct
 password — the shared server password, unless that account has set its own
 personal password, in which case only that one works (see `/ppass` below).
-Login state itself isn't persisted between joins — everyone has to log in
-again each time they connect.
+Logging in restores their original gamemode from before they were locked,
+exactly where they were standing. Login state itself isn't persisted between
+joins — everyone has to log in again each time they connect.
 
 Because the check happens entirely server-side, players don't need to install
 anything — this only needs to go on the server.
@@ -28,13 +30,13 @@ anything — this only needs to go on the server.
 ./gradlew build
 ```
 
-The output jar is `build/libs/serverpassword-1.2.1.jar`.
+The output jar is `build/libs/serverpassword-1.3.0.jar`.
 
 ## Installing
 
 1. Install [Fabric Loader](https://fabricmc.net/use/server/) 0.19.5+ for Minecraft 1.21.11 on your server.
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api/version/0.141.1+1.21.11) for 1.21.11 and drop it in `mods/`.
-3. Drop `serverpassword-1.2.1.jar` in `mods/` too.
+3. Drop `serverpassword-1.3.0.jar` in `mods/` too.
 4. Start the server once to generate `config/serverpassword.json`, then edit it and set a real password.
 5. Restart, or run `/serverpassword reload` after editing the file while the server is running.
 
@@ -60,6 +62,11 @@ Personal passwords live separately in `config/serverpassword-players.json`, keye
 by username and stored as SHA-256 hashes (never plain text). You normally
 won't need to touch this file directly — use the commands below.
 
+There's also `config/serverpassword-pending-gamemode.json`, which just remembers
+what gamemode a locked player should be restored to on login. It's only ever
+populated while someone is actually locked out and waiting to log in — don't
+edit it.
+
 ## Commands
 
 - `/login <password>` — everyone can run this; it's the only command that works before logging in. If the account has a personal password set, **only** that password works; otherwise the shared server password works.
@@ -74,4 +81,5 @@ won't need to touch this file directly — use the commands below.
 - Login state itself isn't remembered between joins — everyone has to log in every time they connect, even if they have a personal password set.
 - **Ops get no exemption.** The lock checks login state only, never permission level — an op who forgets to log in is frozen, blocked, and will get kicked by the login timeout just like anyone else. A command typed at the server console (or via RCON) isn't gated, since that's not a player connection.
 - Sneaking/sprinting toggles aren't blocked while locked, since they aren't a security concern on their own; movement, chat, commands, inventory, and world/entity interaction all are.
+- Turning `enabled` off with `/serverpassword reload` while players are actively locked won't pull them out of spectator mode on its own — they'd still need to `/login` once to get restored, even though the lock itself stops enforcing anything else in the meantime. This is a narrow edge case (toggling the mod off mid-session while people are actively joining) rather than something you'd hit in normal use.
 - This targets 1.21.11 specifically, using Mojang's official mappings (Yarn's mapping updates stop after 1.21.11, and the ecosystem has moved to Mojang mappings as the default going forward). Porting past 1.21.11 needs re-checking, since Minecraft removes obfuscation mappings entirely starting with the 26.1 game drop, which changes how mods are built.

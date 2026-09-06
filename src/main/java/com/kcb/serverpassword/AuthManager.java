@@ -1,6 +1,7 @@
 package com.kcb.serverpassword;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.GameType;
 
 import java.util.Locale;
 import java.util.Map;
@@ -14,7 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Nothing here is persisted - every player has to log in again each time they join.
  */
 public class AuthManager {
-	public record FrozenPos(ServerLevel level, double x, double y, double z, float yaw, float pitch, long joinTick) {
+	public record FrozenPos(ServerLevel level, double x, double y, double z, float yaw, float pitch, long joinTick,
+							 GameType originalGameMode) {
 	}
 
 	private final Set<UUID> unauthenticated = ConcurrentHashMap.newKeySet();
