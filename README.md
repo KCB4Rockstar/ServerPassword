@@ -28,13 +28,13 @@ No client-side mod is needed. This only goes on the server.
 ./gradlew build
 ```
 
-Output jar: `build/libs/serverpassword-1.3.0.jar`.
+Output jar: `build/libs/serverpassword-1.3.0+26.1.2.jar`.
 
 ## Installing
 
 1. Install [Fabric Loader](https://fabricmc.net/use/server/) 0.19.5+ for Minecraft 1.21.11.
 2. Get [Fabric API](https://modrinth.com/mod/fabric-api/version/0.141.1+1.21.11) for 1.21.11 and put it in `mods/`.
-3. Put `serverpassword-1.3.0.jar` in `mods/` too.
+3. Put `serverpassword-1.3.0+26.1.2.jar` in `mods/` too.
 4. Start the server once to generate `config/serverpassword.json`, then set a real password in it.
 5. Restart, or run `/serverpassword reload` to pick up the change without restarting.
 
