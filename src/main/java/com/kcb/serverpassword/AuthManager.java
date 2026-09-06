@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Nothing here is persisted - every player has to log in again each time they join.
  */
 public class AuthManager {
-	public record FrozenPos(ServerLevel level, double x, double y, double z, float yaw, float pitch) {
+	public record FrozenPos(ServerLevel level, double x, double y, double z, float yaw, float pitch, long joinTick) {
 	}
 
 	private final Set<UUID> unauthenticated = ConcurrentHashMap.newKeySet();

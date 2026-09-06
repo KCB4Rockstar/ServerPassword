@@ -1,6 +1,7 @@
 package com.kcb.serverpassword.command;
 
 import com.kcb.serverpassword.AuthManager;
+import com.kcb.serverpassword.PlayerPasswordManager;
 import com.kcb.serverpassword.ServerPasswordMod;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -8,6 +9,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
@@ -22,6 +24,22 @@ public final class ServerPasswordCommands {
 		dispatcher.register(Commands.literal("login")
 				.then(Commands.argument("password", StringArgumentType.greedyString())
 						.executes(ServerPasswordCommands::executeLogin)));
+
+		dispatcher.register(Commands.literal("ppass")
+				.then(Commands.argument("password", StringArgumentType.word())
+						.then(Commands.argument("confirm", StringArgumentType.word())
+								.executes(ServerPasswordCommands::executePPass))));
+
+		dispatcher.register(Commands.literal("rpass")
+				.then(Commands.argument("password", StringArgumentType.word())
+						.executes(ServerPasswordCommands::executeRPass)));
+
+		dispatcher.register(Commands.literal("rppass")
+				.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
+				.then(Commands.argument("username", StringArgumentType.word())
+						.suggests((context, builder) -> SharedSuggestionProvider.suggest(
+								ServerPasswordMod.getInstance().getPlayerPasswordManager().getKnownUsernames(), builder))
+						.executes(ServerPasswordCommands::executeForceRemovePersonalPassword)));
 
 		dispatcher.register(Commands.literal("serverpassword")
 				.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
@@ -45,7 +63,14 @@ public final class ServerPasswordCommands {
 			return 0;
 		}
 
-		if (attempt.equals(mod.getConfig().password)) {
+		String username = player.getGameProfile().name();
+		PlayerPasswordManager personalPasswords = mod.getPlayerPasswordManager();
+
+		boolean serverPasswordOk = attempt.equals(mod.getConfig().password);
+		boolean personalPasswordOk = personalPasswords.hasPassword(username)
+				&& personalPasswords.checkPassword(username, attempt);
+
+		if (serverPasswordOk || personalPasswordOk) {
 			auth.markAuthenticated(uuid);
 			player.sendSystemMessage(Component.literal("§aLogin successful. Welcome!"));
 			return 1;
@@ -58,6 +83,57 @@ public final class ServerPasswordCommands {
 		} else {
 			context.getSource().sendFailure(Component.literal("Incorrect password."));
 		}
+		return 0;
+	}
+
+	private static int executePPass(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		ServerPlayer player = context.getSource().getPlayerOrException();
+		String password = StringArgumentType.getString(context, "password");
+		String confirm = StringArgumentType.getString(context, "confirm");
+
+		if (!password.equals(confirm)) {
+			context.getSource().sendFailure(Component.literal("Those passwords don't match. Usage: /ppass <password> <password>"));
+			return 0;
+		}
+
+		ServerPasswordMod.getInstance().getPlayerPasswordManager()
+				.setPassword(player.getGameProfile().name(), password);
+		player.sendSystemMessage(Component.literal("§aPersonal password set. You can now log in with either the server password or this one."));
+		return 1;
+	}
+
+	private static int executeRPass(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		ServerPlayer player = context.getSource().getPlayerOrException();
+		String attempt = StringArgumentType.getString(context, "password");
+		String username = player.getGameProfile().name();
+
+		PlayerPasswordManager personalPasswords = ServerPasswordMod.getInstance().getPlayerPasswordManager();
+
+		if (!personalPasswords.hasPassword(username)) {
+			context.getSource().sendFailure(Component.literal("You don't have a personal password set."));
+			return 0;
+		}
+
+		if (!personalPasswords.checkPassword(username, attempt)) {
+			context.getSource().sendFailure(Component.literal("Incorrect password."));
+			return 0;
+		}
+
+		personalPasswords.removePassword(username);
+		player.sendSystemMessage(Component.literal("§aPersonal password removed."));
+		return 1;
+	}
+
+	private static int executeForceRemovePersonalPassword(CommandContext<CommandSourceStack> context) {
+		String username = StringArgumentType.getString(context, "username");
+		boolean removed = ServerPasswordMod.getInstance().getPlayerPasswordManager().removePassword(username);
+
+		if (removed) {
+			context.getSource().sendSuccess(() -> Component.literal("Removed " + username + "'s personal password."), true);
+			return 1;
+		}
+
+		context.getSource().sendFailure(Component.literal(username + " doesn't have a personal password set."));
 		return 0;
 	}
 

@@ -5,6 +5,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket;
 import net.minecraft.network.protocol.game.ServerboundChatPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,11 +17,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Fabric API has no general "block any command" or "block chat" hook, so the
- * unauthenticated-player gate for chat and commands is applied here, directly
- * on the packet handlers. Movement is handled separately (see ServerPasswordMod's
- * tick loop) by snapping the player back in place, which avoids client-side
- * position desync that cancelling movement packets outright would cause.
+ * Fabric API has no general "block any command", "block chat", or "block
+ * inventory action" hook, so the unauthenticated-player gate for those is
+ * applied here, directly on the packet handlers. Movement is handled
+ * separately (see ServerPasswordMod's tick loop) by snapping the player back
+ * in place, which avoids client-side position desync that cancelling
+ * movement packets outright would cause.
  */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class AuthGateMixin {
@@ -46,6 +50,33 @@ public abstract class AuthGateMixin {
 		if (isBlocked() && !isAllowed(packet.command())) {
 			ci.cancel();
 			remind();
+		}
+	}
+
+	// Covers dropping items (Q), swapping to the offhand (F), and starting/stopping
+	// block breaking - all bundled into this one packet.
+	@Inject(method = "handlePlayerAction", at = @At("HEAD"), cancellable = true)
+	private void serverpassword$blockPlayerAction(ServerboundPlayerActionPacket packet, CallbackInfo ci) {
+		if (isBlocked()) {
+			ci.cancel();
+			remind();
+		}
+	}
+
+	// Covers moving/splitting/shift-clicking items in the player's own inventory screen,
+	// which is always available client-side (no "open a container" step to gate on).
+	@Inject(method = "handleContainerClick", at = @At("HEAD"), cancellable = true)
+	private void serverpassword$blockContainerClick(ServerboundContainerClickPacket packet, CallbackInfo ci) {
+		if (isBlocked()) {
+			ci.cancel();
+			remind();
+		}
+	}
+
+	@Inject(method = "handleSetCreativeModeSlot", at = @At("HEAD"), cancellable = true)
+	private void serverpassword$blockCreativeSlot(ServerboundSetCreativeModeSlotPacket packet, CallbackInfo ci) {
+		if (isBlocked()) {
+			ci.cancel();
 		}
 	}
 

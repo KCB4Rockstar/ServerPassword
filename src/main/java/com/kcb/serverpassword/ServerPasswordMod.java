@@ -19,6 +19,7 @@ import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -29,6 +30,7 @@ public class ServerPasswordMod implements ModInitializer {
 	private static ServerPasswordMod instance;
 
 	private final AuthManager authManager = new AuthManager();
+	private PlayerPasswordManager playerPasswordManager;
 	private ModConfig config;
 	private long tickCounter = 0;
 
@@ -38,6 +40,10 @@ public class ServerPasswordMod implements ModInitializer {
 
 	public AuthManager getAuthManager() {
 		return authManager;
+	}
+
+	public PlayerPasswordManager getPlayerPasswordManager() {
+		return playerPasswordManager;
 	}
 
 	public ModConfig getConfig() {
@@ -52,6 +58,7 @@ public class ServerPasswordMod implements ModInitializer {
 	public void onInitialize() {
 		instance = this;
 		config = ModConfig.load();
+		playerPasswordManager = PlayerPasswordManager.load();
 
 		if (config.password == null || config.password.isBlank() || config.password.equals("changeme")) {
 			LOGGER.warn("ServerPassword is using the default password! Set a real one with /serverpassword set <password>, or by editing config/serverpassword.json");
@@ -64,7 +71,7 @@ public class ServerPasswordMod implements ModInitializer {
 
 			ServerPlayer player = handler.player;
 			authManager.markUnauthenticated(player.getUUID(), new AuthManager.FrozenPos(
-					player.level(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot()));
+					player.level(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(), tickCounter));
 
 			player.sendSystemMessage(Component.literal("§eThis server is password protected. Type §6/login <password>§e to continue."));
 		});
@@ -89,8 +96,11 @@ public class ServerPasswordMod implements ModInitializer {
 		}
 
 		boolean sendReminder = config.reminderIntervalTicks > 0 && tickCounter % config.reminderIntervalTicks == 0;
+		long timeoutTicks = config.loginTimeoutSeconds * 20L;
 
-		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+		// Copy the player list: disconnecting a player below would otherwise mutate
+		// the server's live list while this loop is iterating over it.
+		for (ServerPlayer player : List.copyOf(server.getPlayerList().getPlayers())) {
 			UUID uuid = player.getUUID();
 			if (authManager.isAuthenticated(uuid)) {
 				continue;
@@ -98,6 +108,11 @@ public class ServerPasswordMod implements ModInitializer {
 
 			AuthManager.FrozenPos frozen = authManager.getFrozenPos(uuid);
 			if (frozen == null) {
+				continue;
+			}
+
+			if (config.loginTimeoutSeconds > 0 && tickCounter - frozen.joinTick() >= timeoutTicks) {
+				player.connection.disconnect(Component.literal("You took too long to log in."));
 				continue;
 			}
 

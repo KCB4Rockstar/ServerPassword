@@ -18,6 +18,7 @@ public class ModConfig {
 	public boolean enabled = true;
 	public int maxLoginAttempts = 5;
 	public int reminderIntervalTicks = 100;
+	public int loginTimeoutSeconds = 60;
 
 	public static ModConfig load() {
 		if (Files.exists(PATH)) {
