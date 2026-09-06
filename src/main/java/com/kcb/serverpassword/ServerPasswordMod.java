@@ -165,7 +165,7 @@ public class ServerPasswordMod implements ModInitializer {
 			player.fallDistance = 0;
 
 			if (sendReminder) {
-				player.displayClientMessage(Component.literal("§eLog in with §6/login <password>§e to play."), true);
+				player.sendOverlayMessage(Component.literal("§eLog in with §6/login <password>§e to play."));
 			}
 		}
 	}
