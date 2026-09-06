@@ -66,11 +66,14 @@ public final class ServerPasswordCommands {
 		String username = player.getGameProfile().name();
 		PlayerPasswordManager personalPasswords = mod.getPlayerPasswordManager();
 
-		boolean serverPasswordOk = attempt.equals(mod.getConfig().password);
-		boolean personalPasswordOk = personalPasswords.hasPassword(username)
-				&& personalPasswords.checkPassword(username, attempt);
+		// A personal password locks the account to that password alone - otherwise
+		// it would be pointless, since anyone could still walk in with the shared
+		// server password on a cracked/offline server where usernames aren't verified.
+		boolean loggedIn = personalPasswords.hasPassword(username)
+				? personalPasswords.checkPassword(username, attempt)
+				: attempt.equals(mod.getConfig().password);
 
-		if (serverPasswordOk || personalPasswordOk) {
+		if (loggedIn) {
 			auth.markAuthenticated(uuid);
 			player.sendSystemMessage(Component.literal("§aLogin successful. Welcome!"));
 			return 1;
@@ -98,7 +101,7 @@ public final class ServerPasswordCommands {
 
 		ServerPasswordMod.getInstance().getPlayerPasswordManager()
 				.setPassword(player.getGameProfile().name(), password);
-		player.sendSystemMessage(Component.literal("§aPersonal password set. You can now log in with either the server password or this one."));
+		player.sendSystemMessage(Component.literal("§aPersonal password set. From now on, only this password logs your account in - the server password will no longer work for you."));
 		return 1;
 	}
 
@@ -120,7 +123,7 @@ public final class ServerPasswordCommands {
 		}
 
 		personalPasswords.removePassword(username);
-		player.sendSystemMessage(Component.literal("§aPersonal password removed."));
+		player.sendSystemMessage(Component.literal("§aPersonal password removed. The server password will log you in again."));
 		return 1;
 	}
 
@@ -129,7 +132,7 @@ public final class ServerPasswordCommands {
 		boolean removed = ServerPasswordMod.getInstance().getPlayerPasswordManager().removePassword(username);
 
 		if (removed) {
-			context.getSource().sendSuccess(() -> Component.literal("Removed " + username + "'s personal password."), true);
+			context.getSource().sendSuccess(() -> Component.literal("Removed " + username + "'s personal password. The server password will log that account in again."), true);
 			return 1;
 		}
 

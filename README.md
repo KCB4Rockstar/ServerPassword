@@ -14,9 +14,10 @@ When a player joins:
 - They're kicked if they don't log in within 60 seconds (configurable).
 
 All of that lifts the moment they run `/login <password>` with the correct
-password — either the shared server password, or their own personal password
-if they've set one. Login state itself isn't persisted between joins —
-everyone has to log in again each time they connect.
+password — the shared server password, unless that account has set its own
+personal password, in which case only that one works (see `/ppass` below).
+Login state itself isn't persisted between joins — everyone has to log in
+again each time they connect.
 
 Because the check happens entirely server-side, players don't need to install
 anything — this only needs to go on the server.
@@ -27,13 +28,13 @@ anything — this only needs to go on the server.
 ./gradlew build
 ```
 
-The output jar is `build/libs/serverpassword-1.2.0.jar`.
+The output jar is `build/libs/serverpassword-1.2.1.jar`.
 
 ## Installing
 
 1. Install [Fabric Loader](https://fabricmc.net/use/server/) 0.19.5+ for Minecraft 1.21.11 on your server.
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api/version/0.141.1+1.21.11) for 1.21.11 and drop it in `mods/`.
-3. Drop `serverpassword-1.2.0.jar` in `mods/` too.
+3. Drop `serverpassword-1.2.1.jar` in `mods/` too.
 4. Start the server once to generate `config/serverpassword.json`, then edit it and set a real password.
 5. Restart, or run `/serverpassword reload` after editing the file while the server is running.
 
@@ -61,10 +62,10 @@ won't need to touch this file directly — use the commands below.
 
 ## Commands
 
-- `/login <password>` — everyone can run this; it's the only command that works before logging in. Accepts either the server password or the player's own personal password, if they've set one.
-- `/ppass <password> <password>` — sets (or replaces) your own personal password; type it twice to confirm. Only works once you're already logged in.
-- `/rpass <password>` — removes your personal password. Requires the current password as confirmation.
-- `/rppass <username>` — force-clears a player's personal password, e.g. if they've forgotten it (op/admin only). Works even if that player is offline.
+- `/login <password>` — everyone can run this; it's the only command that works before logging in. If the account has a personal password set, **only** that password works; otherwise the shared server password works.
+- `/ppass <password> <password>` — sets (or replaces) your own personal password; type it twice to confirm. Only works once you're already logged in. Once set, the shared server password no longer logs that account in — this is what makes a personal password actually protect a username on a cracked/offline server, where anyone could otherwise type in a name that isn't theirs.
+- `/rpass <password>` — removes your personal password, reverting the account back to the shared server password. Requires the current password as confirmation.
+- `/rppass <username>` — force-clears a player's personal password, e.g. if they've forgotten it and are now locked out (op/admin only). Reverts that account to the shared server password. Works even if that player is offline.
 - `/serverpassword set <password>` — changes the shared server password and saves it to the config (op/admin only).
 - `/serverpassword reload` — reloads the config from disk (op/admin only).
 
