@@ -1,8 +1,8 @@
-package com.kcb.serverpassword.command;
+package com.kcb.serverpass.command;
 
-import com.kcb.serverpassword.AuthManager;
-import com.kcb.serverpassword.PlayerPasswordManager;
-import com.kcb.serverpassword.ServerPasswordMod;
+import com.kcb.serverpass.AuthManager;
+import com.kcb.serverpass.PlayerDataStore;
+import com.kcb.serverpass.ServerPassMod;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -17,45 +17,45 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
 
-public final class ServerPasswordCommands {
-	private ServerPasswordCommands() {
+public final class ServerPassCommands {
+	private ServerPassCommands() {
 	}
 
 	public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
 		dispatcher.register(Commands.literal("login")
 				.then(Commands.argument("password", StringArgumentType.greedyString())
-						.executes(ServerPasswordCommands::executeLogin)));
+						.executes(ServerPassCommands::executeLogin)));
 
 		dispatcher.register(Commands.literal("ppass")
 				.then(Commands.argument("password", StringArgumentType.word())
 						.then(Commands.argument("confirm", StringArgumentType.word())
-								.executes(ServerPasswordCommands::executePPass))));
+								.executes(ServerPassCommands::executePPass))));
 
 		dispatcher.register(Commands.literal("rpass")
 				.then(Commands.argument("password", StringArgumentType.word())
-						.executes(ServerPasswordCommands::executeRPass)));
+						.executes(ServerPassCommands::executeRPass)));
 
 		dispatcher.register(Commands.literal("rppass")
 				.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
 				.then(Commands.argument("username", StringArgumentType.word())
 						.suggests((context, builder) -> SharedSuggestionProvider.suggest(
-								ServerPasswordMod.getInstance().getPlayerPasswordManager().getKnownUsernames(), builder))
-						.executes(ServerPasswordCommands::executeForceRemovePersonalPassword)));
+								ServerPassMod.getInstance().getPlayerDataStore().getKnownUsernames(), builder))
+						.executes(ServerPassCommands::executeForceRemovePersonalPassword)));
 
-		dispatcher.register(Commands.literal("serverpassword")
+		dispatcher.register(Commands.literal("serverpass")
 				.requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_ADMIN))
 				.then(Commands.literal("set")
 						.then(Commands.argument("password", StringArgumentType.greedyString())
-								.executes(ServerPasswordCommands::executeSet)))
+								.executes(ServerPassCommands::executeSet)))
 				.then(Commands.literal("reload")
-						.executes(ServerPasswordCommands::executeReload)));
+						.executes(ServerPassCommands::executeReload)));
 	}
 
 	private static int executeLogin(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		ServerPlayer player = context.getSource().getPlayerOrException();
 		String attempt = StringArgumentType.getString(context, "password");
 
-		ServerPasswordMod mod = ServerPasswordMod.getInstance();
+		ServerPassMod mod = ServerPassMod.getInstance();
 		AuthManager auth = mod.getAuthManager();
 		UUID uuid = player.getUUID();
 
@@ -65,7 +65,7 @@ public final class ServerPasswordCommands {
 		}
 
 		String username = player.getGameProfile().name();
-		PlayerPasswordManager personalPasswords = mod.getPlayerPasswordManager();
+		PlayerDataStore personalPasswords = mod.getPlayerDataStore();
 
 		// A personal password locks the account to that password alone - otherwise
 		// it would be pointless, since anyone could still walk in with the shared
@@ -109,7 +109,7 @@ public final class ServerPasswordCommands {
 			return 0;
 		}
 
-		ServerPasswordMod.getInstance().getPlayerPasswordManager()
+		ServerPassMod.getInstance().getPlayerDataStore()
 				.setPassword(player.getGameProfile().name(), password);
 		player.sendSystemMessage(Component.literal("§aPersonal password set. From now on, only this password logs your account in - the server password will no longer work for you."));
 		return 1;
@@ -120,7 +120,7 @@ public final class ServerPasswordCommands {
 		String attempt = StringArgumentType.getString(context, "password");
 		String username = player.getGameProfile().name();
 
-		PlayerPasswordManager personalPasswords = ServerPasswordMod.getInstance().getPlayerPasswordManager();
+		PlayerDataStore personalPasswords = ServerPassMod.getInstance().getPlayerDataStore();
 
 		if (!personalPasswords.hasPassword(username)) {
 			context.getSource().sendFailure(Component.literal("You don't have a personal password set."));
@@ -139,7 +139,7 @@ public final class ServerPasswordCommands {
 
 	private static int executeForceRemovePersonalPassword(CommandContext<CommandSourceStack> context) {
 		String username = StringArgumentType.getString(context, "username");
-		boolean removed = ServerPasswordMod.getInstance().getPlayerPasswordManager().removePassword(username);
+		boolean removed = ServerPassMod.getInstance().getPlayerDataStore().removePassword(username);
 
 		if (removed) {
 			context.getSource().sendSuccess(() -> Component.literal("Removed " + username + "'s personal password. The server password will log that account in again."), true);
@@ -152,7 +152,7 @@ public final class ServerPasswordCommands {
 
 	private static int executeSet(CommandContext<CommandSourceStack> context) {
 		String newPassword = StringArgumentType.getString(context, "password");
-		ServerPasswordMod mod = ServerPasswordMod.getInstance();
+		ServerPassMod mod = ServerPassMod.getInstance();
 		mod.getConfig().password = newPassword;
 		mod.getConfig().save();
 		context.getSource().sendSuccess(() -> Component.literal("Server password updated."), true);
@@ -160,8 +160,8 @@ public final class ServerPasswordCommands {
 	}
 
 	private static int executeReload(CommandContext<CommandSourceStack> context) {
-		ServerPasswordMod.getInstance().reloadConfig();
-		context.getSource().sendSuccess(() -> Component.literal("ServerPassword config reloaded."), true);
+		ServerPassMod.getInstance().reloadConfig();
+		context.getSource().sendSuccess(() -> Component.literal("ServerPass config reloaded."), true);
 		return 1;
 	}
 }
