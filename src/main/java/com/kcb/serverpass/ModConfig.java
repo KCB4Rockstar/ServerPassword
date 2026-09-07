@@ -1,4 +1,4 @@
-package com.kcb.serverpassword;
+package com.kcb.serverpass;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -12,13 +12,14 @@ import java.nio.file.Path;
 
 public class ModConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("serverpassword.json");
+	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("serverpass").resolve("config.json");
 
 	public String password = "changeme";
 	public boolean enabled = true;
 	public int maxLoginAttempts = 5;
 	public int reminderIntervalTicks = 100;
 	public int loginTimeoutSeconds = 60;
+	public int reconnectGraceSeconds = 600;
 
 	public static ModConfig load() {
 		if (Files.exists(PATH)) {
@@ -28,7 +29,7 @@ public class ModConfig {
 					return loaded;
 				}
 			} catch (IOException e) {
-				ServerPasswordMod.LOGGER.error("Failed to read config, using defaults", e);
+				ServerPassMod.LOGGER.error("Failed to read config, using defaults", e);
 			}
 		}
 
@@ -44,7 +45,7 @@ public class ModConfig {
 				GSON.toJson(this, writer);
 			}
 		} catch (IOException e) {
-			ServerPasswordMod.LOGGER.error("Failed to save config", e);
+			ServerPassMod.LOGGER.error("Failed to save config", e);
 		}
 	}
 }

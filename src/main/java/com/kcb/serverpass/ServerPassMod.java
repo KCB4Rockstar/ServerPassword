@@ -1,6 +1,6 @@
-package com.kcb.serverpassword;
+package com.kcb.serverpass;
 
-import com.kcb.serverpassword.command.ServerPasswordCommands;
+import com.kcb.serverpass.command.ServerPassCommands;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -25,19 +25,19 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public class ServerPasswordMod implements ModInitializer {
-	public static final String MOD_ID = "serverpassword";
+public class ServerPassMod implements ModInitializer {
+	public static final String MOD_ID = "serverpass";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	private static ServerPasswordMod instance;
+	private static ServerPassMod instance;
 
 	private final AuthManager authManager = new AuthManager();
-	private PlayerPasswordManager playerPasswordManager;
+	private PlayerDataStore playerDataStore;
 	private PendingGameModeStore pendingGameModeStore;
 	private ModConfig config;
 	private long tickCounter = 0;
 
-	public static ServerPasswordMod getInstance() {
+	public static ServerPassMod getInstance() {
 		return instance;
 	}
 
@@ -45,8 +45,8 @@ public class ServerPasswordMod implements ModInitializer {
 		return authManager;
 	}
 
-	public PlayerPasswordManager getPlayerPasswordManager() {
-		return playerPasswordManager;
+	public PlayerDataStore getPlayerDataStore() {
+		return playerDataStore;
 	}
 
 	public PendingGameModeStore getPendingGameModeStore() {
@@ -65,11 +65,11 @@ public class ServerPasswordMod implements ModInitializer {
 	public void onInitialize() {
 		instance = this;
 		config = ModConfig.load();
-		playerPasswordManager = PlayerPasswordManager.load();
+		playerDataStore = PlayerDataStore.load();
 		pendingGameModeStore = PendingGameModeStore.load();
 
 		if (config.password == null || config.password.isBlank() || config.password.equals("changeme")) {
-			LOGGER.warn("ServerPassword is using the default password! Set a real one with /serverpassword set <password>, or by editing config/serverpassword.json");
+			LOGGER.warn("ServerPass is using the default password! Set a real one with /serverpass set <password>, or by editing config/serverpass/config.json");
 		}
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -78,7 +78,15 @@ public class ServerPasswordMod implements ModInitializer {
 			}
 
 			ServerPlayer player = handler.player;
-			GameType originalGameMode = pendingGameModeStore.resolveOriginal(player.getGameProfile().name(), player.gameMode());
+			String username = player.getGameProfile().name();
+
+			long graceMillis = config.reconnectGraceSeconds * 1000L;
+			if (playerDataStore.isWithinReconnectGrace(username, player.getIpAddress(), graceMillis)) {
+				player.sendSystemMessage(Component.literal("§eWelcome back! You reconnected quickly enough to skip logging in again."));
+				return;
+			}
+
+			GameType originalGameMode = pendingGameModeStore.resolveOriginal(username, player.gameMode());
 
 			authManager.markUnauthenticated(player.getUUID(), new AuthManager.FrozenPos(
 					player.level(), player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(),
@@ -96,8 +104,13 @@ public class ServerPasswordMod implements ModInitializer {
 
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			ServerPlayer player = handler.player;
-			AuthManager.FrozenPos frozen = authManager.getFrozenPos(player.getUUID());
+			UUID uuid = player.getUUID();
 
+			if (config.enabled && authManager.isAuthenticated(uuid)) {
+				playerDataStore.recordDisconnect(player.getGameProfile().name(), player.getIpAddress());
+			}
+
+			AuthManager.FrozenPos frozen = authManager.getFrozenPos(uuid);
 			if (frozen != null) {
 				// Best-effort: if this lands before the player's data is saved, their
 				// saved gamemode won't incorrectly be "spectator". Not load-bearing for
@@ -106,17 +119,17 @@ public class ServerPasswordMod implements ModInitializer {
 				player.setGameMode(frozen.originalGameMode());
 			}
 
-			authManager.forget(player.getUUID());
+			authManager.forget(uuid);
 		});
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-				ServerPasswordCommands.register(dispatcher));
+				ServerPassCommands.register(dispatcher));
 
 		registerInteractionGuards();
 
 		ServerTickEvents.END_SERVER_TICK.register(this::onEndTick);
 
-		LOGGER.info("ServerPassword initialized.");
+		LOGGER.info("ServerPass initialized.");
 	}
 
 	private void onEndTick(MinecraftServer server) {

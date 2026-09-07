@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "serverpassword",
+  "id": "serverpass",
   "version": "${version}",
-  "name": "ServerPassword",
+  "name": "ServerPass",
   "description": "Locks a cracked/offline-mode server behind a single shared password. Players can't move, chat, or run commands until they log in with /login <password>.",
   "authors": [
     "kcbgta97"
@@ -10,11 +10,11 @@
   "environment": "server",
   "entrypoints": {
     "main": [
-      "com.kcb.serverpassword.ServerPasswordMod"
+      "com.kcb.serverpass.ServerPassMod"
     ]
   },
   "mixins": [
-    "serverpassword.mixins.json"
+    "serverpass.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.0",

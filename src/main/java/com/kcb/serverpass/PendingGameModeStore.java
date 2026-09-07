@@ -1,4 +1,4 @@
-package com.kcb.serverpassword;
+package com.kcb.serverpass;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PendingGameModeStore {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("serverpassword-pending-gamemode.json");
+	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("serverpass").resolve("pending-gamemode.json");
 	private static final Type MAP_TYPE = new TypeToken<Map<String, String>>() {
 	}.getType();
 
@@ -48,7 +48,7 @@ public class PendingGameModeStore {
 					store.pending.putAll(loaded);
 				}
 			} catch (IOException e) {
-				ServerPasswordMod.LOGGER.error("Failed to read pending gamemode recovery data, starting empty", e);
+				ServerPassMod.LOGGER.error("Failed to read pending gamemode recovery data, starting empty", e);
 			}
 		}
 
@@ -62,7 +62,7 @@ public class PendingGameModeStore {
 				GSON.toJson(pending, writer);
 			}
 		} catch (IOException e) {
-			ServerPasswordMod.LOGGER.error("Failed to save pending gamemode recovery data", e);
+			ServerPassMod.LOGGER.error("Failed to save pending gamemode recovery data", e);
 		}
 	}
 
