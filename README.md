@@ -1,4 +1,4 @@
-# ServerPassword
+# ServerPass
 
 A server-side Fabric mod for Minecraft 1.21.11 that locks the server behind a
 shared password. Meant for `online-mode=false` (cracked) servers that want
@@ -17,8 +17,12 @@ When a player joins, until they log in:
 Logging in with the correct password restores their gamemode and unlocks
 everything, right where they were standing. The correct password is the
 shared server password, unless the account has set its own personal
-password with `/ppass`, in which case only that works. Login isn't
-remembered between joins, so everyone logs in again each time they connect.
+password with `/ppass`, in which case only that works.
+
+Login isn't remembered between server restarts, but a quick reconnect is:
+if a logged-in player disconnects and reconnects from the same IP address
+within `reconnectGraceSeconds` (10 minutes by default), they're let straight
+back in without having to log in again.
 
 No client-side mod is needed. This only goes on the server.
 
@@ -28,17 +32,17 @@ No client-side mod is needed. This only goes on the server.
 ./gradlew build
 ```
 
-Output jar: `build/libs/serverpassword-1.3.0+1.21.11.jar`.
+Output jar: `build/libs/serverpass-1.4.0+1.21.11.jar`.
 
 ## Installing
 
 1. Install [Fabric Loader](https://fabricmc.net/use/server/) 0.19.5+ for Minecraft 1.21.11.
 2. Get [Fabric API](https://modrinth.com/mod/fabric-api/version/0.141.1+1.21.11) for 1.21.11 and put it in `mods/`.
-3. Put `serverpassword-1.3.0+1.21.11.jar` in `mods/` too.
-4. Start the server once to generate `config/serverpassword.json`, then set a real password in it.
-5. Restart, or run `/serverpassword reload` to pick up the change without restarting.
+3. Put `serverpass-1.4.0+1.21.11.jar` in `mods/` too.
+4. Start the server once to generate `config/serverpass/config.json`, then set a real password in it.
+5. Restart, or run `/serverpass reload` to pick up the change without restarting.
 
-## Configuration (`config/serverpassword.json`)
+## Configuration (`config/serverpass/config.json`)
 
 ```json
 {
@@ -46,7 +50,8 @@ Output jar: `build/libs/serverpassword-1.3.0+1.21.11.jar`.
   "enabled": true,
   "maxLoginAttempts": 5,
   "reminderIntervalTicks": 100,
-  "loginTimeoutSeconds": 60
+  "loginTimeoutSeconds": 60,
+  "reconnectGraceSeconds": 600
 }
 ```
 
@@ -55,12 +60,17 @@ Output jar: `build/libs/serverpassword-1.3.0+1.21.11.jar`.
 - `maxLoginAttempts`: kick after this many wrong guesses in one session (`0` disables kicking).
 - `reminderIntervalTicks`: how often, in ticks, a locked player is reminded to log in.
 - `loginTimeoutSeconds`: kick a locked player after this many seconds (`0` disables the timeout).
+- `reconnectGraceSeconds`: skip the login prompt if a player reconnects from the
+  same IP within this many seconds of disconnecting while logged in (`0` disables this,
+  always requiring login).
 
-Personal passwords are stored separately in `config/serverpassword-players.json`,
-keyed by username and hashed with SHA-256. You shouldn't need to edit this file.
+Two other files live alongside it in `config/serverpass/`, both managed by the
+mod and not meant to be hand-edited:
 
-`config/serverpassword-pending-gamemode.json` tracks what gamemode a locked
-player should be restored to on login. Also not meant to be edited by hand.
+- `players.json`: personal passwords (hashed with SHA-256, keyed by username),
+  and the IP/timestamp used for the reconnect grace period.
+- `pending-gamemode.json`: tracks what gamemode a locked player should be
+  restored to on login.
 
 ## Commands
 
@@ -74,16 +84,21 @@ player should be restored to on login. Also not meant to be edited by hand.
   The account goes back to using the shared password.
 - `/rppass <username>`: op-only. Clears a player's personal password, e.g. if
   they forgot it and are locked out. Works on offline players.
-- `/serverpassword set <password>`: op-only. Changes the shared password.
-- `/serverpassword reload`: op-only. Reloads the config from disk.
+- `/serverpass set <password>`: op-only. Changes the shared password.
+- `/serverpass reload`: op-only. Reloads the config from disk.
 
 ## Notes
 
-- Everyone logs in fresh each join, even with a personal password set.
 - Ops aren't exempt. The lock is based on login state, not permission level,
   so an unlogged-in op is frozen and blocked like anyone else, and gets
   kicked by the timeout too. Console and RCON commands aren't affected,
   since those aren't player connections.
+- The reconnect grace period only applies after a real successful login -
+  disconnecting while still locked out doesn't start it, so it can't be used
+  to skip logging in the first time.
+- It checks the connecting IP only, not the username tied to it, so it won't
+  help someone who's spoofing a different player's name from the same
+  network - they'd still need that account's actual password.
 - Sneaking and sprinting still work while locked. They're not a security
   concern on their own.
 - Turning the mod off with players still mid-login won't pull them out of

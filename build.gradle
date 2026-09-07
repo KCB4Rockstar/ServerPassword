@@ -24,7 +24,7 @@ processResources {
 }
 
 // Jar file names always carry the mod name, mod version, and Minecraft
-// version, e.g. serverpassword-1.3.0+1.21.11.jar - the fabric.mod.json
+// version, e.g. serverpass-1.4.0+1.21.11.jar - the fabric.mod.json
 // version above stays just the mod's own version.
 def jarVersion = "${project.version}+${minecraft_version}"
 tasks.withType(AbstractArchiveTask).configureEach {

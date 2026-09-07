@@ -1,4 +1,4 @@
-package com.kcb.serverpassword;
+package com.kcb.serverpass;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.GameType;
